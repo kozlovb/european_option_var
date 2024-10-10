@@ -1,2 +1,9 @@
-# european_option_var
-Var of european call option
+# set up
+
+pip install -r requirements.txt
+
+
+# run
+
+python 
+
