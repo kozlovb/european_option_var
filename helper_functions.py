@@ -1,8 +1,6 @@
 import numpy as np
 import scipy.stats as st
-# todo use yield ?
 import matplotlib.pyplot as plt
-# not too much data old data ? 
 
 TRADIG_DAYS_IN_YEAR = 252
 
@@ -79,12 +77,12 @@ def plot_pnl(pnl):
     plt.grid(True)
     plt.show()
 
-def calculate_var_es(one_day_change, confidence_level_VaR, confidence_level_ES):
+def calculate_var_es(pnl, confidence_level_VaR, confidence_level_ES):
     """
     Calculate historical Value at Risk (VaR) and Expected Shortfall (ES) for given P&L.
 
     Parameters:
-    - one_day_change (np.array): Array of daily P&L changes.
+    - pnl (np.array): Array of possible daily P&L changes.
     - confidence_level_VaR (float): Confidence level for VaR (e.g., 0.99 for 99%).
     - confidence_level_ES (float): Confidence level for ES (e.g., 0.975 for 97.5%).
 
@@ -92,9 +90,6 @@ def calculate_var_es(one_day_change, confidence_level_VaR, confidence_level_ES):
     - var (float): The calculated 1-day VaR.
     - es (float): The calculated 1-day Expected Shortfall (ES).
     """
-    #TODO do we need to apply np array?
-    pnl = np.array(one_day_change)
-
 
     var = np.percentile(pnl, (1 - confidence_level_VaR) * 100)
 
@@ -140,22 +135,19 @@ def simulate_one_day_change(S0, relative_prices, K, T, r, sigma):
     
     return np.array(option_prices)
 
-def generate_normal_daily_returns(mean=0.001, std_dev=0.02, size=1000):
+def generate_normal_returns_array(mean=1.0004979584458054, std_dev=0.011230757672735115, size=10000):
     """
-    Generator for normally distributed daily returns.
+    Generate an array of normally distributed daily returns.
     
     Parameters:
-    - mean: The mean of the daily returns (default: 0.001).
-    - std_dev: The standard deviation of the daily returns (default: 0.02).
-    - size: The number of daily returns to generate (default: 1000). 
+    - mean: The mean of the normal distribution.
+    - std_dev: The standard deviation of the normal distribution.
+    - size: The number of values to generate.
     
-    Yields:
-    - A normally distributed daily return.
+    Returns:
+    - A NumPy array of normally distributed values.
     """
-    count = 0
-    while count < size:
-        yield np.random.normal(loc=mean, scale=std_dev)
-        count += 1
+    return np.random.normal(loc=mean, scale=std_dev, size=size)
 
 def volatility_smile(current_price, strike_price, historical_volatility):
     """

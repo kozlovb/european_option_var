@@ -1,12 +1,3 @@
-
-# not too much data old data ? 
-
-
-#TODO exceptions may be
-#TODO add docs
-# todo discuss risks
-#TODO add tests
-
 from helper_functions import (
     read_historical_data,
     get_relative_prices,
@@ -15,10 +6,11 @@ from helper_functions import (
     calculate_var_es,
     simulate_one_day_change,
     volatility_smile,
-    check_parameters
+    check_parameters,
+    generate_normal_returns_array,
 )
 
-def calculate_one_day_eu_call_option_var_es(S0, K, T, r, confidence_level_VaR, confidence_level_ES, relative_prices, to_plot_pnl=True):
+def calculate_one_day_eu_call_option_var_es(S0, K, T, r, confidence_level_VaR, confidence_level_ES, relative_prices, to_plot_pnl=False):
     """
     Calculate the 1-day VaR and ES for a European call option.
     
@@ -47,32 +39,29 @@ def calculate_one_day_eu_call_option_var_es(S0, K, T, r, confidence_level_VaR, c
 
         simulated_implied_volatility = volatility_smile(S0, K, historical_volatility)
 
-        option_prices_in_one_day = simulate_one_day_change(S0, relative_prices, K, T, r, simulated_implied_volatility)
+        one_day_pnl = simulate_one_day_change(S0, relative_prices, K, T, r, simulated_implied_volatility)
 
         if to_plot_pnl:
-            plot_pnl(option_prices_in_one_day)
+            plot_pnl(one_day_pnl)
 
-        var, es = calculate_var_es(option_prices_in_one_day, confidence_level_VaR, confidence_level_ES)
+        var, es = calculate_var_es(one_day_pnl, confidence_level_VaR, confidence_level_ES)
 
         return var, es, None
 
     except Exception as e:
         return 0, 0, str(e)
 
-
-#TODO add doc on how install libs
-# Main function
 def main():
     # Option parameters
     S0 = 5751.13  # Initial price of the underlying asset
     K = 5800  # Strike price of the option
-    T = 300/365  # Time to expiration in years (300 days)
+    T = 1.0  # Time to expiration in years
     r = 0.05  # Risk-free interest rate
     confidence_level_VaR = 0.99  # 99% confidence level for VaR
     confidence_level_ES = 0.975  # 97.5% confidence level for ES
     relative_prices = get_relative_prices(read_historical_data("SP500_10y.csv"))
+    #relative_prices = generate_normal_returns_array()
 
-    # Print results
     var, es, err = calculate_one_day_eu_call_option_var_es(S0, K, T, r, confidence_level_VaR, confidence_level_ES, relative_prices)
     if not err:
         print(f"1-day VaR (99%): {var:.2f}")
