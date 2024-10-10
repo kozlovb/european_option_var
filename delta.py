@@ -14,8 +14,7 @@ TRADIG_DAYS_IN_YEAR = 252
 
 def read_historical_data(file_name):
     data_array = np.genfromtxt(file_name, delimiter=',', skip_header=1, dtype=None, encoding='utf-8')
-    print(data_array)
-    prices = [row[1] for row in data_array]
+    prices = [row[1] for row in data_array[::-1]]
     return np.array(prices)
 
 ### comments everywhere ? function name return value etc
@@ -24,10 +23,10 @@ def get_relative_prices(prices):
     return prices[1:] / prices[:-1]
 
 def calculate_historical_volatility(relative_prices):
-    # Step 2: Compute daily volatility (standard deviation of simple returns)
     return np.sqrt(TRADIG_DAYS_IN_YEAR) * np.std(relative_prices)
-#TODO plug it 
-def volatility_smile(strike_price, current_price, historical_volatility):
+
+
+def volatility_smile(current_price, strike_price, historical_volatility):
     """
     Simple model of volatility smile.
     
@@ -63,9 +62,6 @@ def black_scholes_call_price(S, K, T, r, sigma):
     call_price = S * st.norm.cdf(d1) - K * np.exp(-r * T) * st.norm.cdf(d2)
     return call_price
 
-# Simulate future asset prices using historical returns or normally distributed returns
-
-
 def generate_normal_daily_returns(mean=0.001, std_dev=0.02, size=1000):
     """
     Generator for normally distributed daily returns.
@@ -83,36 +79,11 @@ def generate_normal_daily_returns(mean=0.001, std_dev=0.02, size=1000):
         yield np.random.normal(loc=mean, scale=std_dev)
         count += 1
 
-
-# Simulate option prices
-def simulate_asset_prices(S0, relative_prices, K, T, r, sigma):
-    option_prices = []
-
-    # Loop over daily returns
-    for relative_price in relative_prices:
-
-        S = S0 * (relative_price)  #correct or not ? 
-        
-        # Update time to maturity (reduce by 1 day each step)
-        T_remaining = T - (1) / TRADIG_DAYS_IN_YEAR  # Assuming 252 trading days in a year
-        
-        # Ensure T does not become negative TODO just not allow options like this
-        if T_remaining <= 0:
-            T_remaining = 0.0001  # Avoid zero division error in Black-Scholes
-        
-        # Calculate option price using Black-Scholes
-        call_price = black_scholes_call_price(S, K, T_remaining, r, sigma)
-        
-        # Append calculated option price to the list
-        option_prices.append(call_price)
-    
-    return np.array(option_prices)
-
 def plot_pnl(pnl):
     plt.figure(figsize=(10, 6))
     
     # Plot histogram of P&L
-    plt.hist(pnl, bins=50, color='blue', alpha=0.7, edgecolor='black')
+    plt.hist(pnl, bins=100, color='blue', alpha=0.7, edgecolor='black')
 
     # Add labels and title
     plt.title('Profit and Loss (P&L) Distribution', fontsize=16)
@@ -124,9 +95,12 @@ def plot_pnl(pnl):
     plt.show()
 
 # Historical Simulation for VaR and ES
-def historical_var_es(option_prices, K, T, r, sigma, confidence_level_VaR, confidence_level_ES, initial_option_price):
-    pnl  =  np.array(option_prices)  - initial_option_price
+def historical_var_es(one_day_change, confidence_level_VaR, confidence_level_ES):
+    # may be its already an array ?
+    pnl  =  np.array(one_day_change)
+
     plot_pnl(pnl)
+    print("Mean of the array options",     np.mean(pnl))
 
     # Calculate VaR using the specified confidence level
     var = np.percentile(pnl, (1 - confidence_level_VaR) * 100)
@@ -138,42 +112,67 @@ def historical_var_es(option_prices, K, T, r, sigma, confidence_level_VaR, confi
     es = losses_beyond_es_threshold.mean() if len(losses_beyond_es_threshold) > 0 else es_threshold
     return var, es, pnl
 
-def plot_simulated_prices(simulated_prices):
-    plt.figure(figsize=(10, 6))
+def simulate_one_day_change(S0, relative_prices, K, T, r, sigma):
+    option_prices = []
+    initial_option_price = black_scholes_call_price(S0, K, T, r, sigma)
+    # Loop over each relative price (just for one day change)
+    for relative_price in relative_prices:
+        # Calculate the new asset price based on one day's change
+        S = S0 * relative_price
+        
+        # Update time to maturity (reduce by 1 day)
+        T_remaining = T - (1 / TRADIG_DAYS_IN_YEAR)
+        
+        if T_remaining <= 0:
+            T_remaining = 0.0001  # Avoid zero division error in Black-Scholes
+        
+        # Calculate option price at the start of the day (S0, T)
+        #TODO do not recalculate this
+        call_price_start_of_day = initial_option_price
+        
+        # Calculate option price at the end of the day (S, T_remaining)
+        call_price_end_of_day = black_scholes_call_price(S, K, T_remaining, r, sigma)
+        
+        # Calculate PnL as the difference between the two prices
+        pnl = call_price_end_of_day - initial_option_price
+
+        # Append PnL to the list
+        option_prices.append(pnl)
     
-    # Plot histogram of the final simulated prices after 1 day
-    plt.hist(simulated_prices[:, -1], bins=50, color='green', alpha=0.7, edgecolor='black')
+    return np.array(option_prices)
 
-    # Add labels and title
-    plt.title('1-Day Simulated Asset Price Distribution', fontsize=16)
-    plt.xlabel('Price', fontsize=14)
-    plt.ylabel('Frequency', fontsize=14)
 
-    # Show the plot
-    plt.grid(True)
-    plt.show()
+
 #TODO add doc on how install libs
 # Main function
 def main():
     # Option parameters
     S0 = 5751.13  # Initial price of the underlying asset
-    K = 5750  # Strike price of the option
-    T = 30/365  # Time to expiration in years (30 days)
+    K = 5800  # Strike price of the option
+    T = 300/365  # Time to expiration in years (30 days)
     r = 0.05  # Risk-free interest rate
-    sigma = 0.2  # Volatility (increased for more variation)
     confidence_level_VaR = 0.99  # 99% confidence level for VaR
     confidence_level_ES = 0.975  # 97.5% confidence level for ES
    
     relative_prices = get_relative_prices(read_historical_data("SP500_10y.csv"))
+    print("last rel price", relative_prices[-1])
+    print("before last rel price", relative_prices[-2])
+
+    ###########
+
+
+    tmp = relative_prices-1
+    print("Mean of the array price",     np.mean(tmp))
+    plot_pnl(relative_prices-1)
     historical_volatility = calculate_historical_volatility(relative_prices)
-    print("historical_volatility", historical_volatility)
-    simulated_implied_volatility = volatility_smile(K, S0, historical_volatility)
+
+    simulated_implied_volatility = volatility_smile(S0, K, historical_volatility)
 
     # here can plug  a generator
-    option_prices_historical_simulation = simulate_asset_prices(S0, relative_prices, K, T, r, simulated_implied_volatility)
-    initial_option_price = black_scholes_call_price(S0, K, T, r, sigma)
+    one_day_change = simulate_one_day_change(S0, relative_prices, K, T, r, simulated_implied_volatility)
 
-    var, es, pnl = historical_var_es(option_prices_historical_simulation, K, T, r, simulated_implied_volatility, confidence_level_VaR, confidence_level_ES, initial_option_price)
+
+    var, es, pnl = historical_var_es(one_day_change, confidence_level_VaR, confidence_level_ES)
 
     # Print results
     print(f"1-day VaR (99%): {var:.2f}")
