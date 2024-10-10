@@ -2,7 +2,7 @@
 
 This script calculates the Value at Risk (VaR) and Expected Shortfall (ES) for a portfolio consisting of a single European call option on the S&P 500. The VaR and ES are calculated for a one-day period using historical data.
 
-# Set up
+## Set up
 
 pip install -r requirements.txt
 
